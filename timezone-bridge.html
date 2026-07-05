@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensory Bridge: Voice-Activated Time Engine</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --accent: #10b981;
+            --border: #334155;
+            --time-highlight: #f59e0b;
+            --wakeword-glow: #ef4444;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header-panel {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        .header-panel h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+
+        .header-panel p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .voice-status-bar {
+            background-color: #0f172a;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .voice-status-bar.listening-for-command {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+
+        .voice-status-bar.listening-for-wakeword {
+            border-color: var(--primary);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            background-color: var(--text-muted);
+            border-radius: 50%;
+        }
+
+        .listening-for-wakeword .status-dot {
+            background-color: var(--primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        .listening-for-command .status-dot {
+            background-color: var(--accent);
+            animation: pulse 0.6s infinite;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .grid-layout {
+                grid-template-columns: 320px 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .home-clock-display {
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .home-time {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+            font-family: monospace;
+        }
+
+        .home-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .select-control {
+            width: 100%;
+            background-color: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            width: 100%;
+            background-color: var(--primary);
+            color: #0f172a;
+            font-weight: bold;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .btn.active {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .zone-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .zone-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #0f172a;
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .zone-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .zone-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .zone-offset {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .zone-time-container {
+            text-align: right;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .zone-time {
+            font-size: 1.5rem;
+            font-weight: bold;
+            font-family: monospace;
+            color: var(--time-highlight);
+        }
+
+        .zone-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 5px;
+        }
+
+        .assistant-popup-log {
+            background-color: #090d16;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--primary);
+            min-height: 40px;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        .slider-panel {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .time-slider {
+            flex-grow: 1;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .slider-badge {
+            background-color: #0f172a;
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.95rem;
+            min-width: 90px;
+            text-align: center;
+            color: var(--time-highlight);
+        }
+
+        .slider-reset-btn {
+            background-color: var(--border);
+            color: var(--text-main);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .slider-reset-btn:hover {
+            background-color: #475569;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-panel">
+            <h1>🌐 Universal Voice-Activated Time Bridge</h1>
+            <p>Hands-Free Intelligent Matrix Coordination System</p>
+        </div>
+
+        <div id="voice-status-card" class="voice-status-bar">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="status-text">System Monitoring Offline</span>
+            </div>
+            <div style="width: 60%;">
+                <div id="assistant-log" class="assistant-popup-log">Awaiting voice system initialization...</div>
+            </div>
+        </div>
+
+        <div class="slider-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">🕒 Linear Matrix Time Shift Slider</label>
+                <button class="slider-reset-btn" onclick="resetTimeSlider()">Reset Time Offset</button>
+            </div>
+            <div class="slider-container">
+                <input type="range" id="matrix-time-offset" class="time-slider" min="-12" max="12" step="0.5" value="0" oninput="handleSliderChange(this.value)">
+                <div id="slider-val-display" class="slider-badge">Normal (0h)</div>
+            </div>
+        </div>
+
+        <div class="grid-layout">
+            <div class="card">
+                <h2>🎙️ Voice Control</h2>
+                <div class="control-group">
+                    <button id="system-toggle-btn" class="btn" onclick="toggleVoiceAssistantSystem()">
+                        🚀 Initialize Voice Assistant
+                    </button>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin: 0;">
+                    💡 <strong>How to use hands-free:</strong> Say the word <span style="color:var(--primary); font-weight:bold;">"Assistant"</span>. The panel will turn green. Then clearly ask your question.
+                </p>
+
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+                <h2>📍 Local Base Time</h2>
+                <div class="home-clock-display">
+                    <div id="home-clock" class="home-time">00:00:00 AM</div>
+                    <div id="home-zone-label" class="home-label">Detecting System Locale...</div>
+                </div>
+
+                <h2>➕ Add Location</h2>
+                <div class="control-group">
+                    <label for="zone-search">Select Target Region</label>
+                    <select id="zone-search" class="select-control"></select>
+                </div>
+                <button class="btn" onclick="addNewTimeZoneRow()">Add Time Zone</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 Time Comparison Matrix (Real-time updates)</h2>
+                <div id="active-zone-list" class="zone-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const timeZoneDatabase = [
+            { label: "Agadir, Morocco (WET)", value: "Africa/Casablanca", keywords: ["agadir", "morocco"], cityName: "Agadir" },
+            { label: "Albufeira, Portugal (WET)", value: "Europe/Lisbon", keywords: ["albufeira"], cityName: "Albufeira" },
+            { label: "Amadora, Portugal (WET)", value: "Europe/Lisbon", keywords: ["amadora"], cityName: "Amadora" },
+            { label: "Ansan, South Korea (KST)", value: "Asia/Seoul", keywords: ["ansan", "korea"], cityName: "Ansan" },
+            { label: "Arezzo, Italy (CET)", value: "Europe/Rome", keywords: ["arezzo", "italy"], cityName: "Arezzo" },
+            { label: "Asan, South Korea (KST)", value: "Asia/Seoul", keywords: ["asan"], cityName: "Asan" },
+            { label: "Ballarat, Australia (AEST)", value: "Australia/Melbourne", keywords: ["ballarat", "australia"], cityName: "Ballarat" },
+            { label: "Barakaldo, Spain (CET)", value: "Europe/Madrid", keywords: ["barakaldo", "spain"], cityName: "Barakaldo" },
+            { label: "Barcelona, Spain (CET)", value: "Europe/Madrid", keywords: ["barcelona"], cityName: "Barcelona" },
+            { label: "Barcelos, Portugal (WET)", value: "Europe/Lisbon", keywords: ["barcelos"], cityName: "Barcelos" },
+            { label: "Bari, Italy (CET)", value: "Europe/Rome", keywords: ["bari"], cityName: "Bari" },
+            { label: "Beja, Portugal (WET)", value: "Europe/Lisbon", keywords: ["beja"], cityName: "Beja" },
+            { label: "Bergen, Norway (CET)", value: "Europe/Oslo", keywords: ["bergen", "norway"], cityName: "Bergen" },
+            { label: "Berlin, Germany (CET)", value: "Europe/Berlin", keywords: ["berlin", "germany", "neukölln", "neukolln"], cityName: "Berlin" },
+            { label: "Besançon, France (CET)", value: "Europe/Paris", keywords: ["besançon", "besancon", "france"], cityName: "Besançon" },
+            { label: "Bilbao, Spain (CET)", value: "Europe/Madrid", keywords: ["bilbao"], cityName: "Bilbao" },
+            { label: "Botkyrka, Sweden (CET)", value: "Europe/Stockholm", keywords: ["botkyrka", "sweden"], cityName: "Botkyrka" },
+            { label: "Bradford, UK (GMT)", value: "Europe/London", keywords: ["bradford", "uk", "united kingdom"], cityName: "Bradford" },
+            { label: "Braga, Portugal (WET)", value: "Europe/Lisbon", keywords: ["braga"], cityName: "Braga" },
+            { label: "Bucharest, Romania (EET)", value: "Europe/Bucharest", keywords: ["bucharest", "romania"], cityName: "Bucharest" },
+            { label: "Bursa-Osmangazi, Türkiye (TRT)", value: "Europe/Istanbul", keywords: ["bursa", "osmangazi", "türkiye", "turkey"], cityName: "Bursa" },
+            { label: "Calderdale, UK (GMT)", value: "Europe/London", keywords: ["calderdale"], cityName: "Calderdale" },
+            { label: "Camden, UK (GMT)", value: "Europe/London", keywords: ["camden"], cityName: "Camden" },
+            { label: "Campi Bisenzio, Italy (CET)", value: "Europe/Rome", keywords: ["campi", "bisenzio"], cityName: "Campi Bisenzio" },
+            { label: "Capannori, Italy (CET)", value: "Europe/Rome", keywords: ["capannori"], cityName: "Capannori" },
+            { label: "Cartagena, Spain (CET)", value: "Europe/Madrid", keywords: ["cartagena"], cityName: "Cartagena" },
+            { label: "Casalecchio di Reno, Italy (CET)", value: "Europe/Rome", keywords: ["casalecchio", "reno"], cityName: "Casalecchio di Reno" },
+            { label: "Casablanca, Morocco (WET)", value: "Africa/Casablanca", keywords: ["casablanca"], cityName: "Casablanca" },
+            { label: "Cascais, Portugal (WET)", value: "Europe/Lisbon", keywords: ["cascais"], cityName: "Cascais" },
+            { label: "Castellón de la Plana, Spain (CET)", value: "Europe/Madrid", keywords: ["castellón", "castellon", "plana"], cityName: "Castellón de la Plana" },
+            { label: "Chefchaouen, Morocco (WET)", value: "Africa/Casablanca", keywords: ["chefchaouen"], cityName: "Chefchaouen" },
+            { label: "Chicago, USA (CST/CDT)", value: "America/Chicago", keywords: ["chicago", "cst", "cdt", "central"], cityName: "Chicago" },
+            { label: "Coimbra, Portugal (WET)", value: "Europe/Lisbon", keywords: ["coimbra"], cityName: "Coimbra" },
+            { label: "Donostia / San Sebastian, Spain (CET)", value: "Europe/Madrid", keywords: ["donostia", "san sebastian"], cityName: "San Sebastian" },
+            { label: "Drammen, Norway (CET)", value: "Europe/Oslo", keywords: ["drammen"], cityName: "Drammen" },
+            { label: "Drummondville, Canada (EST/EDT)", value: "America/Toronto", keywords: ["drummondville", "canada"], cityName: "Drummondville" },
+            { label: "Dubai, UAE (GST)", value: "Asia/Dubai", keywords: ["dubai", "uae", "emirates"], cityName: "Dubai" },
+            { label: "Dublin, Ireland (GMT/IST)", value: "Europe/Dublin", keywords: ["dublin", "ireland"], cityName: "Dublin" },
+            { label: "Dudelange, Luxembourg (CET)", value: "Europe/Luxembourg", keywords: ["dudelange", "luxembourg"], cityName: "Dudelange" },
+            { label: "Ephesus Selçuk, Türkiye (TRT)", value: "Europe/Istanbul", keywords: ["ephesus", "selçuk", "selcuk"], cityName: "Ephesus Selçuk" },
+            { label: "Erlangen, Germany (CET)", value: "Europe/Berlin", keywords: ["erlangen"], cityName: "Erlangen" },
+            { label: "Etterbeek, Belgium (CET)", value: "Europe/Brussels", keywords: ["etterbeek", "belgium"], cityName: "Etterbeek" },
+            { label: "Famalicão, Portugal (WET)", value: "Europe/Lisbon", keywords: ["famalicão", "famalicao"], cityName: "Famalicão" },
+            { label: "Fermo, Italy (CET)", value: "Europe/Rome", keywords: ["fermo"], cityName: "Fermo" },
+            { label: "Forlì, Italy (CET)", value: "Europe/Rome", keywords: ["forlì", "forli"], cityName: "Forlì" },
+            { label: "Fucecchio, Italy (CET)", value: "Europe/Rome", keywords: ["fucecchio"], cityName: "Fucecchio" },
+            { label: "Fuenlabrada, Spain (CET)", value: "Europe/Madrid", keywords: ["fuenlabrada"], cityName: "Fuenlabrada" },
+            { label: "Gatineau, Canada (EST/EDT)", value: "America/Toronto", keywords: ["gatineau"], cityName: "Gatineau" },
+            { label: "Geneva, Switzerland (CET)", value: "Europe/Zurich", keywords: ["geneva", "switzerland", "zurich"], cityName: "Geneva" },
+            { label: "Genova, Italy (CET)", value: "Europe/Rome", keywords: ["genova", "genoa"], cityName: "Genova" },
+            { label: "Getafe, Spain (CET)", value: "Europe/Madrid", keywords: ["getafe"], cityName: "Getafe" },
+            { label: "Getxo, Spain (CET)", value: "Europe/Madrid", keywords: ["getxo"], cityName: "Getxo" },
+            { label: "Gimpo, South Korea (KST)", value: "Asia/Seoul", keywords: ["gimpo"], cityName: "Gimpo" },
+            { label: "Guadalupe, Mexico (CST)", value: "America/Monterrey", keywords: ["guadalupe", "mexico"], cityName: "Guadalupe" },
+            { label: "Guro, South Korea (KST)", value: "Asia/Seoul", keywords: ["guro"], cityName: "Guro" },
+            { label: "Haifa, Israel (EET)", value: "Asia/Jerusalem", keywords: ["haifa", "israel", "jerusalem"], cityName: "Haifa" },
+            { label: "Hamamatsu, Japan (JST)", value: "Asia/Tokyo", keywords: ["hamamatsu"], cityName: "Hamamatsu" },
+            { label: "Hämeenlinna, Finland (EET)", value: "Europe/Helsinki", keywords: ["hämeenlinna", "hameenlinna", "finland"], cityName: "Hämeenlinna" },
+            { label: "Hong Kong (HKT)", value: "Asia/Hong_Kong", keywords: ["hong kong", "hk"], cityName: "Hong Kong" },
+            { label: "Ioannina, Greece (EET)", value: "Europe/Athens", keywords: ["ioannina", "greece", "athens"], cityName: "Ioannina" },
+            { label: "Iztapalapa, Mexico (CST)", value: "America/Mexico_City", keywords: ["iztapalapa"], cityName: "Iztapalapa" },
+            { label: "Jerez de la Frontera, Spain (CET)", value: "Europe/Madrid", keywords: ["jerez", "frontera"], cityName: "Jerez de la Frontera" },
+            { label: "Jonava, Lithuania (EET)", value: "Europe/Vilnius", keywords: ["jonava", "lithuania", "vilnius"], cityName: "Jonava" },
+            { label: "Kenitra, Morocco (WET)", value: "Africa/Casablanca", keywords: ["kenitra"], cityName: "Kenitra" },
+            { label: "Krakow, Poland (CET)", value: "Europe/Warsaw", keywords: ["krakow", "cracow", "poland", "warsaw"], cityName: "Krakow" },
+            { label: "Kristiansand, Norway (CET)", value: "Europe/Oslo", keywords: ["kristiansand"], cityName: "Kristiansand" },
+            { label: "Larache, Morocco (WET)", value: "Africa/Casablanca", keywords: ["larache"], cityName: "Larache" },
+            { label: "Leeds, UK (GMT)", value: "Europe/London", keywords: ["leeds"], cityName: "Leeds" },
+            { label: "Limassol, Cyprus (EET)", value: "Asia/Nicosia", keywords: ["limassol", "cyprus", "nicosia"], cityName: "Limassol" },
+            { label: "Limerick, Ireland (GMT/IST)", value: "Europe/Dublin", keywords: ["limerick"], cityName: "Limerick" },
+            { label: "Lisbon, Portugal (WET)", value: "Europe/Lisbon", keywords: ["lisbon", "portugal"], cityName: "Lisbon" },
+            { label: "Lodi, Italy (CET)", value: "Europe/Rome", keywords: ["lodi"], cityName: "Lodi" },
+            { label: "Logroño, Spain (CET)", value: "Europe/Madrid", keywords: ["logroño", "logrono"], cityName: "Logroño" },
+            { label: "London, UK (GMT/BST)", value: "Europe/London", keywords: ["london", "gmt", "bst", "england", "britain", "lewisham"], cityName: "London" },
+            { label: "Los Angeles, USA (PST/PDT)", value: "America/Los_Angeles", keywords: ["los angeles", "la", "pst", "pdt", "pacific"], cityName: "Los Angeles" },
+            { label: "Loures, Portugal (WET)", value: "Europe/Lisbon", keywords: ["loures"], cityName: "Loures" },
+            { label: "Lublin, Poland (CET)", value: "Europe/Warsaw", keywords: ["lublin"], cityName: "Lublin" },
+            { label: "Lutsk, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["lutsk", "ukraine", "kyiv", "kiev"], cityName: "Lutsk" },
+            { label: "Lyon, France (CET)", value: "Europe/Paris", keywords: ["lyon"], cityName: "Lyon" },
+            { label: "Málaga, Spain (CET)", value: "Europe/Madrid", keywords: ["málaga", "malaga"], cityName: "Málaga" },
+            { label: "Manchester, UK (GMT)", value: "Europe/London", keywords: ["manchester"], cityName: "Manchester" },
+            { label: "Manlleu, Spain (CET)", value: "Europe/Madrid", keywords: ["manlleu"], cityName: "Manlleu" },
+            { label: "Marrakech, Morocco (WET)", value: "Africa/Casablanca", keywords: ["marrakech", "marrakesh"], cityName: "Marrakech" },
+            { label: "Montreal, Canada (EST/EDT)", value: "America/Toronto", keywords: ["montreal"], cityName: "Montreal" },
+            { label: "New Delhi, India (IST)", value: "Asia/Kolkata", keywords: ["india", "delhi", "new delhi", "ist", "kolkata"], cityName: "New Delhi" },
+            { label: "New York, USA (EST/EDT)", value: "America/New_York", keywords: ["new york", "ny", "est", "edt", "eastern"], cityName: "New York" },
+            { label: "Paris, France (CET)", value: "Europe/Paris", keywords: ["paris", "cet", "europe"], cityName: "Paris" },
+            { label: "Riyadh, Saudi Arabia (AST)", value: "Asia/Riyadh", keywords: ["riyadh", "saudi", "saudi arabia"], cityName: "Riyadh" },
+            { label: "Singapore (SGT)", value: "Asia/Singapore", keywords: ["singapore", "sgt"], cityName: "Singapore" },
+            { label: "Sydney, Australia (AEST)", value: "Australia/Sydney", keywords: ["sydney", "aest"], cityName: "Sydney" },
+            { label: "Tokyo, Japan (JST)", value: "Asia/Tokyo", keywords: ["tokyo", "japan", "jst"], cityName: "Tokyo" },
+            { label: "Toronto, Canada (EST/EDT)", value: "America/Toronto", keywords: ["toronto"], cityName: "Toronto" },
+            { label: "Vancouver, Canada (PST/PDT)", value: "America/Vancouver", keywords: ["vancouver", "bc"], cityName: "Vancouver" },
+            
+            // Indian Cities and Hubs
+            { label: "Kolkata, India (IST)", value: "Asia/Kolkata", keywords: ["kolkata", "calcutta"], cityName: "Kolkata" },
+            { label: "Mumbai, India (IST)", value: "Asia/Kolkata", keywords: ["mumbai", "bombay"], cityName: "Mumbai" },
+            { label: "Bengaluru, India (IST)", value: "Asia/Kolkata", keywords: ["bengaluru", "bangalore"], cityName: "Bengaluru" },
+            { label: "Chennai, India (IST)", value: "Asia/Kolkata", keywords: ["chennai", "madras"], cityName: "Chennai" },
+            { label: "Shanghai, China (CST)", value: "Asia/Shanghai", keywords: ["shanghai", "china"], cityName: "Shanghai" },
+            { label: "Cairo, Egypt (EET)", value: "Africa/Cairo", keywords: ["cairo", "egypt"], cityName: "Cairo" },
+            { label: "Johannesburg, South Africa (SAST)", value: "Africa/Johannesburg", keywords: ["johannesburg", "south africa"], cityName: "Johannesburg" },
+
+            { label: "Goa, India (IST)", value: "Asia/Kolkata", keywords: ["goa"], cityName: "Goa" },
+            { label: "Martil, Morocco (WET)", value: "Africa/Casablanca", keywords: ["martil"], cityName: "Martil" },
+            { label: "Meknes, Morocco (WET)", value: "Africa/Casablanca", keywords: ["meknes"], cityName: "Meknes" },
+            { label: "Melitopol, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["melitopol"], cityName: "Melitopol" },
+            { label: "Melton, Australia (AEST)", value: "Australia/Melbourne", keywords: ["melton"], cityName: "Melton" },
+            { label: "Messina, Italy (CET)", value: "Europe/Rome", keywords: ["messina"], cityName: "Messina" },
+            { label: "Mexico City, Mexico (CST)", value: "America/Mexico_City", keywords: ["mexico city", "mexico"], cityName: "Mexico City" },
+            { label: "Milano, Italy (CET)", value: "Europe/Rome", keywords: ["milano", "milan"], cityName: "Milano" },
+            { label: "Modena, Italy (CET)", value: "Europe/Rome", keywords: ["modena"], cityName: "Modena" },
+            { label: "Montesilvano, Italy (CET)", value: "Europe/Rome", keywords: ["montesilvano"], cityName: "Montesilvano" },
+            { label: "Neuchâtel, Switzerland (CET)", value: "Europe/Zurich", keywords: ["neuchâtel", "neuchatel"], cityName: "Neuchâtel" },
+            { label: "Neumarkt, Germany (CET)", value: "Europe/Berlin", keywords: ["neumarkt"], cityName: "Neumarkt" },
+            { label: "Novellara, Italy (CET)", value: "Europe/Rome", keywords: ["novellara"], cityName: "Novellara" },
+            { label: "Odesa, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["odesa", "odessa"], cityName: "Odesa" },
+            { label: "Oeiras, Portugal (WET)", value: "Europe/Lisbon", keywords: ["oeiras"], cityName: "Oeiras" },
+            { label: "Olbia, Italy (CET)", value: "Europe/Rome", keywords: ["olbia"], cityName: "Olbia" },
+            { label: "Oslo, Norway (CET)", value: "Europe/Oslo", keywords: ["oslo"], cityName: "Oslo" },
+            { label: "Palermo, Italy (CET)", value: "Europe/Rome", keywords: ["palermo"], cityName: "Palermo" },
+            { label: "Pamplona, Spain (CET)", value: "Europe/Madrid", keywords: ["pamplona"], cityName: "Pamplona" },
+            { label: "Paranhos, Portugal (WET)", value: "Europe/Lisbon", keywords: ["paranhos"], cityName: "Paranhos" },
+            { label: "Parla, Spain (CET)", value: "Europe/Madrid", keywords: ["parla"], cityName: "Parla" },
+            { label: "Parma, Italy (CET)", value: "Europe/Rome", keywords: ["parma"], cityName: "Parma" },
+            { label: "Patras, Greece (EET)", value: "Europe/Athens", keywords: ["patras"], cityName: "Patras" },
+            { label: "Pavlohrad, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["pavlohrad"], cityName: "Pavlohrad" },
+            { label: "Pizzo, Italy (CET)", value: "Europe/Rome", keywords: ["pizzo"], cityName: "Pizzo" },
+            { label: "Pompei, Italy (CET)", value: "Europe/Rome", keywords: ["pompei", "pompeii"], cityName: "Pompei" },
+            { label: "Pontedera, Italy (CET)", value: "Europe/Rome", keywords: ["pontedera"], cityName: "Pontedera" },
+            { label: "Portimao, Portugal (WET)", value: "Europe/Lisbon", keywords: ["portimao", "portimão"], cityName: "Portimao" },
+            { label: "Porto, Portugal (WET)", value: "Europe/Lisbon", keywords: ["porto"], cityName: "Porto" },
+            { label: "Portomaggiore, Italy (CET)", value: "Europe/Rome", keywords: ["portomaggiore"], cityName: "Portomaggiore" },
+            { label: "Rabat, Morocco (WET)", value: "Africa/Casablanca", keywords: ["rabat"], cityName: "Rabat" },
+            { label: "Ravenna, Italy (CET)", value: "Europe/Rome", keywords: ["ravenna"], cityName: "Ravenna" },
+            { label: "Reggio-Emilia, Italy (CET)", value: "Europe/Rome", keywords: ["reggio", "emilia", "reggio-emilia"], cityName: "Reggio-Emilia" },
+            { label: "Repentigny, Canada (EST/EDT)", value: "America/Toronto", keywords: ["repentigny"], cityName: "Repentigny" },
+            { label: "Reykjavik, Iceland (GMT)", value: "Atlantic/Reykjavik", keywords: ["reykjavik", "iceland"], cityName: "Reykjavik" },
+            { label: "Riga, Latvia (EET)", value: "Europe/Riga", keywords: ["riga", "latvia"], cityName: "Riga" },
+            { label: "Rijeka, Croatia (CET)", value: "Europe/Zagreb", keywords: ["rijeka"], cityName: "Rijeka" },
+            { label: "Rimouski, Canada (EST/EDT)", value: "America/Rimouski", keywords: ["rimouski"], cityName: "Rimouski" },
+            { label: "Rochester, USA (EST/EDT)", value: "America/New_York", keywords: ["rochester"], cityName: "Rochester" },
+            { label: "Sabadell, Spain (CET)", value: "Europe/Madrid", keywords: ["sabadell"], cityName: "Sabadell" },
+            { label: "Salisbury, Australia (ACST/ACDT)", value: "Australia/Adelaide", keywords: ["salisbury"], cityName: "Salisbury" },
+            { label: "Salt, Spain (CET)", value: "Europe/Madrid", keywords: ["salt"], cityName: "Salt" },
+            { label: "San Giuliano Terme, Italy (CET)", value: "Europe/Rome", keywords: ["san giuliano", "terme"], cityName: "San Giuliano Terme" },
+            { label: "Santa Coloma de Gramenet, Spain (CET)", value: "Europe/Madrid", keywords: ["santa coloma", "gramenet"], cityName: "Santa Coloma de Gramenet" },
+            { label: "Santa Maria da Feira, Portugal (WET)", value: "Europe/Lisbon", keywords: ["santa maria da feira", "feira"], cityName: "Santa Maria da Feira" },
+            { label: "Santander, Spain (CET)", value: "Europe/Madrid", keywords: ["santander"], cityName: "Santander" },
+            { label: "Savignano sul Rubicone, Italy (CET)", value: "Europe/Rome", keywords: ["savignano", "rubicone"], cityName: "Savignano sul Rubicone" },
+            { label: "Seine-Saint-Denis, France (CET)", value: "Europe/Paris", keywords: ["seine-saint-denis", "denis"], cityName: "Seine-Saint-Denis" },
+            { label: "Senigallia, Italy (CET)", value: "Europe/Rome", keywords: ["senigallia"], cityName: "Senigallia" },
+            { label: "Setúbal, Portugal (WET)", value: "Europe/Lisbon", keywords: ["setúbal", "setubal"], cityName: "Setúbal" },
+            { label: "Sherbrooke, Canada (EST/EDT)", value: "America/Toronto", keywords: ["sherbrooke"], cityName: "Sherbrooke" },
+            { label: "Shizuoka Prefecture, Japan (JST)", value: "Asia/Tokyo", keywords: ["shizuoka"], cityName: "Shizuoka" },
+            { label: "Stavanger, Norway (CET)", value: "Europe/Oslo", keywords: ["stavanger"], cityName: "Stavanger" },
+            { label: "Strasbourg, France (CET)", value: "Europe/Paris", keywords: ["strasbourg"], cityName: "Strasbourg" },
+            { label: "Sumy, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["sumy"], cityName: "Sumy" },
+            { label: "Tanger, Morocco (WET)", value: "Africa/Casablanca", keywords: ["tanger", "tangier"], cityName: "Tanger" },
+            { label: "Tenerife, Spain (WET)", value: "Atlantic/Canary", keywords: ["tenerife", "canary"], cityName: "Tenerife" },
+            { label: "Tetouan, Morocco (WET)", value: "Africa/Casablanca", keywords: ["tetouan"], cityName: "Tetouan" },
+            { label: "Trondheim, Norway (CET)", value: "Europe/Oslo", keywords: ["trondheim"], cityName: "Trondheim" },
+            { label: "Torino, Italy (CET)", value: "Europe/Rome", keywords: ["torino", "turin"], cityName: "Torino" },
+            { label: "Torremolinos, Spain (CET)", value: "Europe/Madrid", keywords: ["torremolinos"], cityName: "Torremolinos" },
+            { label: "Tortosa, Spain (CET)", value: "Europe/Madrid", keywords: ["tortosa"], cityName: "Tortosa" },
+            { label: "Un. dei C. Terre dei Castelli, Italy (CET)", value: "Europe/Rome", keywords: ["terre dei castelli", "castelli"], cityName: "Terre dei Castelli" },
+            { label: "Valencia, Spain (CET)", value: "Europe/Madrid", keywords: ["valencia"], cityName: "Valencia" },
+            { label: "Valladolid, Spain (CET)", value: "Europe/Madrid", keywords: ["valladolid"], cityName: "Valladolid" },
+            { label: "Valletta, Malta (CET)", value: "Europe/Malta", keywords: ["valletta", "malta"], cityName: "Valletta" },
+            { label: "Venice, Italy (CET)", value: "Europe/Rome", keywords: ["venice", "venezia"], cityName: "Venice" },
+            { label: "Viareggio, Italy (CET)", value: "Europe/Rome", keywords: ["viareggio"], cityName: "Viareggio" },
+            { label: "Vila Nova de Gaia, Portugal (WET)", value: "Europe/Lisbon", keywords: ["vila nova de gaia", "gaia"], cityName: "Vila Nova de Gaia" },
+            { label: "Vila Verde, Portugal (WET)", value: "Europe/Lisbon", keywords: ["vila verde"], cityName: "Vila Verde" },
+            { label: "Vinnytsia, Ukraine (EET)", value: "Europe/Kyiv", keywords: ["vinnytsia"], cityName: "Vinnytsia" },
+            { label: "Viseu, Portugal (WET)", value: "Europe/Lisbon", keywords: ["viseu"], cityName: "Viseu" },
+            { label: "Wroclaw, Poland (CET)", value: "Europe/Warsaw", keywords: ["wroclaw", "wrocław"], cityName: "Wroclaw" },
+            { label: "Zagarolo, Italy (CET)", value: "Europe/Rome", keywords: ["zagarolo"], cityName: "Zagarolo" },
+            { label: "Zagreb, Croatia (CET)", value: "Europe/Zagreb", keywords: ["zagreb", "croatia"], cityName: "Zagreb" },
+            { label: "Zaragoza, Spain (CET)", value: "Europe/Madrid", keywords: ["zaragoza"], cityName: "Zaragoza" }
+        ];
+
+        const globalTimeZoneMapping = {
+            "gmt": "Europe/London", "utc": "UTC", "bst": "Europe/London",
+            "ist": "Asia/Kolkata", "indian standard": "Asia/Kolkata",
+            "est": "America/New_York", "edt": "America/New_York", "eastern": "America/New_York",
+            "cst": "America/Chicago", "cdt": "America/Chicago", "central": "America/Chicago",
+            "mst": "America/Denver", "mdt": "America/Denver", "mountain": "America/Denver",
+            "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles", "pacific": "America/Los_Angeles",
+            "cet": "Europe/Paris", "cest": "Europe/Paris", "central european": "Europe/Paris",
+            "eet": "Europe/Kyiv", "eest": "Europe/Kyiv", "eastern european": "Europe/Kyiv",
+            "jst": "Asia/Tokyo", "japan standard": "Asia/Tokyo",
+            "sgt": "Asia/Singapore", "aest": "Australia/Sydney", "aedt": "Australia/Sydney"
+        };
+
+        // Instead of raw strings, tracking complete structures to differentiate unique labels sharing identical zones
+        let trackedTimeZones = [
+            { cityName: "Vancouver", value: "America/Vancouver" },
+            { cityName: "New York", value: "America/New_York" },
+            { cityName: "London", value: "Europe/London" },
+            { cityName: "Tokyo", value: "Asia/Tokyo" }
+        ];
+
+        let speechRecognizer = null;
+        let isSystemOnline = false;
+        let isWaitingForCommand = false;
+        let globalTimeSliderOffsetHours = 0;
+
+        window.onload = () => {
+            populateSelectorDropdown();
+            detectLocalSystemParameters();
+            
+            setInterval(() => {
+                renderHomeClock();
+                renderComparisonMatrix();
+            }, 1000);
+        };
+
+        function detectLocalSystemParameters() {
+            try {
+                const nativeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                document.getElementById('home-zone-label').innerText = `Local Base: ${nativeZone}`;
+            } catch (e) {
+                document.getElementById('home-zone-label').innerText = "Local Base: Detected System Profile";
+            }
+        }
+
+        function populateSelectorDropdown() {
+            const dropdown = document.getElementById('zone-search');
+            dropdown.innerHTML = "";
+            timeZoneDatabase.sort((a, b) => a.label.localeCompare(b.label));
+            timeZoneDatabase.forEach((item, index) => {
+                const opt = document.createElement('option');
+                opt.value = index; // Store database index pointer to read comprehensive data
+                opt.innerText = item.label;
+                dropdown.appendChild(opt);
+            });
+        }
+
+        function getShiftedDate() {
+            const currentMoment = new Date();
+            if (globalTimeSliderOffsetHours !== 0) {
+                currentMoment.setTime(currentMoment.getTime() + (globalTimeSliderOffsetHours * 60 * 60 * 1000));
+            }
+            return currentMoment;
+        }
+
+        function renderHomeClock() {
+            const baseMoment = getShiftedDate();
+            const localTimeConfig = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            document.getElementById('home-clock').innerText = baseMoment.toLocaleTimeString(undefined, localTimeConfig);
+        }
+
+        function renderComparisonMatrix() {
+            const baseMoment = getShiftedDate();
+            const listContainer = document.getElementById('active-zone-list');
+            
+            if (trackedTimeZones.length === 0) {
+                listContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center; font-style: italic; padding: 40px 0;">No active locations tracking.</p>`;
+                return;
+            }
+
+            let generatedHtml = "";
+            trackedTimeZones.forEach((trackItem, arrayIndex) => {
+                try {
+                    const timeString = baseMoment.toLocaleTimeString('en-US', { timeZone: trackItem.value, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                    const dateString = baseMoment.toLocaleDateString('en-US', { timeZone: trackItem.value, month: 'short', day: 'numeric', weekday: 'short' });
+                    
+                    generatedHtml += `
+                        <div class="zone-row">
+                            <div class="zone-info">
+                                <span class="zone-name">${trackItem.cityName}</span>
+                                <span class="zone-offset">${trackItem.value}</span>
+                            </div>
+                            <div class="zone-time-container">
+                                <div>
+                                    <div class="zone-time">${timeString}</div>
+                                    <div class="zone-date">${dateString}</div>
+                                </div>
+                                <button class="remove-btn" onclick="removeZoneRow(${arrayIndex})">✕</button>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {}
+            });
+            listContainer.innerHTML = generatedHtml;
+        }
+
+        function handleSliderChange(val) {
+            globalTimeSliderOffsetHours = parseFloat(val);
+            const badge = document.getElementById('slider-val-display');
+            if (globalTimeSliderOffsetHours === 0) {
+                badge.innerText = "Normal (0h)";
+            } else {
+                badge.innerText = (globalTimeSliderOffsetHours > 0 ? "+" : "") + globalTimeSliderOffsetHours + " hrs";
+            }
+            renderHomeClock();
+            renderComparisonMatrix();
+        }
+
+        function resetTimeSlider() {
+            document.getElementById('matrix-time-offset').value = 0;
+            handleSliderChange(0);
+        }
+
+        // ================= VOICE ASSISTANT ENGINE CORE =================
+        function toggleVoiceAssistantSystem() {
+            const toggleBtn = document.getElementById('system-toggle-btn');
+            
+            if (isSystemOnline) {
+                isSystemOnline = false;
+                if (speechRecognizer) {
+                    speechRecognizer.stop();
+                }
+                toggleBtn.innerText = "🚀 Initialize Voice Assistant";
+                toggleBtn.classList.remove('active');
+                document.getElementById('voice-status-card').className = "voice-status-bar";
+                document.getElementById('status-text').innerText = "System Monitoring Offline";
+                document.getElementById('assistant-log').innerText = "Awaiting voice system initialization...";
+                return;
+            }
+
+            const SpeechEngineClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechEngineClass) {
+                alert("Speech recognition API is missing in this browser. Please load this file inside Google Chrome.");
+                return;
+            }
+
+            speechRecognizer = new SpeechEngineClass();
+            speechRecognizer.continuous = true;
+            speechRecognizer.interimResults = false;
+            speechRecognizer.lang = 'en-US';
+
+            speechRecognizer.onresult = (event) => {
+                const latestTranscript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+                document.getElementById('assistant-log').innerText = `Heard: "${latestTranscript}"`;
+                
+                if (!isWaitingForCommand) {
+                    if (latestTranscript.includes("assistant")) {
+                        activateCommandListeningWindow();
+                    }
+                } else {
+                    processVoiceCommand(latestTranscript);
+                }
+            };
+
+            speechRecognizer.onend = () => {
+                if (isSystemOnline && speechRecognizer) {
+                    try { speechRecognizer.start(); } catch(e) {}
+                }
+            };
+
+            speechRecognizer.start();
+            isSystemOnline = true;
+            
+            toggleBtn.innerText = "🛑 Stop Voice System";
+            toggleBtn.classList.add('active');
+            setToWakewordModeUI();
+        }
+
+        function setToWakewordModeUI() {
+            isWaitingForCommand = false;
+            const statusBar = document.getElementById('voice-status-card');
+            statusBar.className = "voice-status-bar listening-for-wakeword";
+            document.getElementById('status-text').innerText = "Listening for Wakeword: 'Assistant'...";
+        }
+
+        function activateCommandListeningWindow() {
+            isWaitingForCommand = true;
+            const statusBar = document.getElementById('voice-status-card');
+            statusBar.className = "voice-status-bar listening-for-command";
+            document.getElementById('status-text').innerText = "Yes? State your time request...";
+            document.getElementById('assistant-log').innerText = "Awaiting question command...";
+            speakSystemUtterance("Yes? How can I help you?");
+        }
+
+        function processVoiceCommand(commandText) {
+            let matchedZoneItem = null;
+            let targetZoneValue = null;
+            let zoneLabelName = "";
+
+            // 1. First look for specific database matching cities
+            for (let item of timeZoneDatabase) {
+                for (let keyword of item.keywords) {
+                    if (commandText.includes(keyword)) {
+                        matchedZoneItem = item;
+                        targetZoneValue = item.value;
+                        zoneLabelName = item.cityName;
+                        break;
+                    }
+                }
+                if (matchedZoneItem) break;
+            }
+
+            // 2. Fallback: Parse explicit named macro time zones (e.g. "EST", "Indian Standard Time")
+            if (!targetZoneValue) {
+                for (let zoneKey in globalTimeZoneMapping) {
+                    if (commandText.includes(zoneKey)) {
+                        targetZoneValue = globalTimeZoneMapping[zoneKey];
+                        zoneLabelName = zoneKey.toUpperCase();
+                        break;
+                    }
+                }
+            }
+
+            // 3. Ultimate Fallback: Check if user is asking about their own local zone
+            if (!targetZoneValue && (commandText.includes("my time zone") || commandText.includes("my timezone") || commandText.includes("local time"))) {
+                try {
+                    targetZoneValue = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    zoneLabelName = "your local zone";
+                } catch(e) {
+                    targetZoneValue = "UTC";
+                    zoneLabelName = "UTC";
+                }
+            }
+
+            let relativeHoursOffset = 0;
+            let calculateRelative = false;
+            let directionPhrase = "from now";
+
+            let processedText = commandText
+                .replace(/\bone\b/g, "1")
+                .replace(/\btwo\b/g, "2")
+                .replace(/\bthree\b/g, "3")
+                .replace(/\bfour\b/g, "4")
+                .replace(/\bfive\b/g, "5")
+                .replace(/\bsix\b/g, "6")
+                .replace(/\bseven\b/g, "7")
+                .replace(/\beight\b/g, "8")
+                .replace(/\bnine\b/g, "9")
+                .replace(/\bten\b/g, "10")
+                .replace(/\beleven\b/g, "11")
+                .replace(/\btwelve\b/g, "12");
+
+            const relativeDirection = (processedText.includes("ago") || processedText.includes("before") || processedText.includes("past")) ? -1 : 1;
+            if (relativeDirection === -1) {
+                directionPhrase = "ago";
+            }
+
+            if (processedText.includes("hour") || processedText.includes("hours") || processedText.includes("in") || processedText.includes("after") || processedText.includes("later") || processedText.includes("next")) {
+                const numbersFound = processedText.match(/\d+(\.\d+)?/);
+                if (numbersFound) {
+                    relativeHoursOffset = parseFloat(numbersFound[0]) * relativeDirection;
+                    calculateRelative = true;
+                } else if (processedText.includes("half an hour")) {
+                    relativeHoursOffset = 0.5 * relativeDirection;
+                    calculateRelative = true;
+                }
+            }
+
+            const targetTimeMoment = getShiftedDate();
+
+            if (calculateRelative) {
+                targetTimeMoment.setTime(targetTimeMoment.getTime() + (relativeHoursOffset * 60 * 60 * 1000));
+            }
+
+            if (targetZoneValue) {
+                try {
+                    const targetTimeStr = targetTimeMoment.toLocaleTimeString('en-US', { timeZone: targetZoneValue, hour: '2-digit', minute: '2-digit', hour12: true });
+                    let answerText = "";
+                    
+                    if (calculateRelative) {
+                        answerText = `The time in ${zoneLabelName} ${Math.abs(relativeHoursOffset)} hours ${directionPhrase} will be ${targetTimeStr}.`;
+                    } else {
+                        answerText = `The current time in ${zoneLabelName} is ${targetTimeStr}.`;
+                    }
+                    
+                    document.getElementById('assistant-log').innerText = answerText;
+                    speakSystemUtterance(answerText);
+                    
+                    // Keep explicit panel tracking restriction intact
+                    const explicitAddRequested = commandText.includes("add") || commandText.includes("track") || commandText.includes("include") || commandText.includes("save");
+                    if (explicitAddRequested) {
+                        // Check if item is already added based on city name matching
+                        const alreadyExists = trackedTimeZones.some(t => t.cityName.toLowerCase() === zoneLabelName.toLowerCase());
+                        if (!alreadyExists) {
+                            trackedTimeZones.push({ cityName: zoneLabelName, value: targetZoneValue });
+                            renderComparisonMatrix();
+                        }
+                    }
+                } catch(err) {
+                    const errorText = "Time calculations failed for that timezone structure. Please try again.";
+                    document.getElementById('assistant-log').innerText = errorText;
+                    speakSystemUtterance(errorText);
+                }
+            } else if (calculateRelative && !targetZoneValue) {
+                const resultTimeStr = targetTimeMoment.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const answerText = `In ${Math.abs(relativeHoursOffset)} hours ${directionPhrase}, the local base time will be ${resultTimeStr}.`;
+                
+                document.getElementById('assistant-log').innerText = answerText;
+                speakSystemUtterance(answerText);
+            } else {
+                const errorText = "I could not locate that destination or interpret the time command. Please try again.";
+                document.getElementById('assistant-log').innerText = errorText;
+                speakSystemUtterance(errorText);
+            }
+
+            setToWakewordModeUI();
+        }
+
+        function speakSystemUtterance(textToSpeak) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const audioVoiceUtterance = new SpeechSynthesisUtterance(textToSpeak);
+                audioVoiceUtterance.rate = 1.0;
+                window.speechSynthesis.speak(audioVoiceUtterance);
+            }
+        }
+
+        // ================= GENERAL UI MATRIX HOOKS =================
+        function addNewTimeZoneRow() {
+            const dropdown = document.getElementById('zone-search');
+            const databaseIndex = dropdown.value;
+            if (databaseIndex === "") return;
+            
+            const selectedItem = timeZoneDatabase[databaseIndex];
+            
+            // Check duplicated instances using specific city name values rather than shared raw offsets
+            const alreadyExists = trackedTimeZones.some(item => item.cityName === selectedItem.cityName);
+            
+            if (!alreadyExists) {
+                trackedTimeZones.push({
+                    cityName: selectedItem.cityName,
+                    value: selectedItem.value
+                });
+                renderComparisonMatrix();
+            }
+        }
+
+        function removeZoneRow(targetIndex) {
+            trackedTimeZones = trackedTimeZones.filter((_, idx) => idx !== targetIndex);
+            renderComparisonMatrix();
+        }
+    </script>
+</body>
+</html>
